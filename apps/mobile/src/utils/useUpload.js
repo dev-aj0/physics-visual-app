@@ -1,73 +1,67 @@
-import * as React from 'react';
-import { UploadClient } from '@uploadcare/upload-client'
-const client = new UploadClient({ publicKey: process.env.EXPO_PUBLIC_UPLOADCARE_PUBLIC_KEY });
+import * as React from "react";
+import { fetchWithTimeout } from "./fetchWithTimeout";
 
 function useUpload() {
   const [loading, setLoading] = React.useState(false);
   const upload = React.useCallback(async (input) => {
     try {
       setLoading(true);
-      let response;
+      const baseURL = process.env.EXPO_PUBLIC_BASE_URL;
+      if (!baseURL) {
+        return { error: "EXPO_PUBLIC_BASE_URL is not configured" };
+      }
 
       if ("reactNativeAsset" in input && input.reactNativeAsset) {
-        let asset = input.reactNativeAsset;
+        const asset = input.reactNativeAsset;
+        const formData = new FormData();
+        const uri = asset.uri;
+        const name = asset.name ?? uri.split("/").pop() ?? "image.jpg";
+        const mimeType = asset.mimeType ?? "image/jpeg";
 
-        if (asset.file) {
-          const formData = new FormData();
-          formData.append("file", asset.file);
+        formData.append("file", {
+          uri,
+          name,
+          type: mimeType,
+        });
 
-          response = await fetch("/_create/api/upload/", {
-            method: "POST",
-            body: formData,
-          });
-        } else {
-          // Fallback to presigned Uploadcare upload
-          const presignRes = await fetch("/_create/api/upload/presign/", {
-            method: "POST",
-          });
-          const { secureSignature, secureExpire } = await presignRes.json();
+        const response = await fetchWithTimeout(`${baseURL}/api/upload`, {
+          method: "POST",
+          body: formData,
+        }, 30000);
 
-          const result = await client.uploadFile(asset, {
-            fileName: asset.name ?? asset.uri.split("/").pop(),
-            contentType: asset.mimeType,
-            secureSignature,
-            secureExpire
-          });
-          return { url: `${process.env.EXPO_PUBLIC_BASE_CREATE_USER_CONTENT_URL}/${result.uuid}/`, mimeType: result.mimeType || null };
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          if (response.status === 413) {
+            throw new Error("File too large. Max 10MB.");
+          }
+          throw new Error(errData.error || "Upload failed");
         }
-      } else if ("url" in input) {
-        response = await fetch("/_create/api/upload/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ url: input.url })
-        });
-      } else if ("base64" in input) {
-        response = await fetch("/_create/api/upload/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ base64: input.base64 })
-        });
-      } else {
-        response = await fetch("/_create/api/upload/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/octet-stream"
-          },
-          body: input.buffer
-        });
+
+        const data = await response.json();
+        return { url: data.url, mimeType: data.mimeType || null };
       }
-      if (!response.ok) {
-        if (response.status === 413) {
-          throw new Error("Upload failed: File too large.");
+
+      if ("base64" in input) {
+        const response = await fetchWithTimeout(`${baseURL}/api/upload`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64: input.base64 }),
+        }, 30000);
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || "Upload failed");
         }
-        throw new Error("Upload failed");
+
+        const data = await response.json();
+        return { url: data.url, mimeType: data.mimeType || null };
       }
-      const data = await response.json();
-      return { url: data.url, mimeType: data.mimeType || null };
+
+      if ("url" in input) {
+        return { url: input.url, mimeType: null };
+      }
+
+      return { error: "Invalid upload input" };
     } catch (uploadError) {
       if (uploadError instanceof Error) {
         return { error: uploadError.message };

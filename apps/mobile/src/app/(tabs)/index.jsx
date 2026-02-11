@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import useUpload from "@/utils/useUpload";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 import { useQuery } from "@tanstack/react-query";
 import { SymbolView } from "expo-symbols";
 import { Platform } from "react-native";
@@ -58,13 +59,14 @@ export default function HomeScreen() {
   const [uploading, setUploading] = useState(false);
   const [recentProblems, setRecentProblems] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
-  const upload = useUpload();
+  const [recentError, setRecentError] = useState(null);
+  const [upload] = useUpload();
 
   const { data: problemsData } = useQuery({
     queryKey: ["problems"],
     queryFn: async () => {
-      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:5173";
-      const response = await fetch(`${baseURL}/api/problems/list`);
+      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
+      const response = await fetchWithTimeout(`${baseURL}/api/problems/list`, {}, 15000);
       if (!response.ok) throw new Error("Failed to fetch problems");
       return response.json();
     },
@@ -79,27 +81,27 @@ export default function HomeScreen() {
   }, []);
 
   const loadRecentProblems = async () => {
+    setRecentError(null);
     try {
-      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:5173";
+      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
       const apiUrl = `${baseURL}/api/problems/list?limit=3`;
       console.log("Fetching recent problems from:", apiUrl);
       
-      const response = await fetch(apiUrl, {
+      const response = await fetchWithTimeout(apiUrl, {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      
+        headers: { "Content-Type": "application/json" },
+      }, 15000);
+
       if (response.ok) {
         const data = await response.json();
         setRecentProblems(data.problems || []);
+        setRecentError(null);
       } else {
-        console.error("Failed to load problems:", response.status, response.statusText);
+        setRecentError("Could not load problems. Check that the server is running.");
       }
     } catch (error) {
       console.error("Error loading recent problems:", error);
-      // Don't show error to user, just log it
+      setRecentError(error.message || "Could not load problems. Check that the server is running.");
     } finally {
       setLoadingRecent(false);
     }
@@ -174,17 +176,17 @@ export default function HomeScreen() {
         }
       }
 
-      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:5173";
+      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
       console.log("Analyzing problem:", { problemText: problemText?.substring(0, 50), hasImage: !!imageUrl });
       
-      const response = await fetch(`${baseURL}/api/problems/analyze`, {
+      const response = await fetchWithTimeout(`${baseURL}/api/problems/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           problemText: problemText.trim() || null,
           imageUrl,
         }),
-      });
+      }, 60000);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -255,7 +257,7 @@ export default function HomeScreen() {
         <View style={{ paddingHorizontal: 24, marginBottom: 24 }}>
           <View
             style={{
-              backgroundColor: "#FFB88C", // Softer pastel orange
+              backgroundColor: colors.secondary,
               borderRadius: 20,
               padding: 24,
             }}
@@ -302,12 +304,12 @@ export default function HomeScreen() {
             <View
               style={{
                 flex: 1,
-                backgroundColor: "#FFFFFF",
+                backgroundColor: colors.card,
                 borderRadius: 16,
                 padding: 20,
                 alignItems: "center",
                 borderWidth: 1,
-                borderColor: "#E8F1F8",
+                borderColor: colors.border,
               }}
             >
               <View
@@ -315,25 +317,25 @@ export default function HomeScreen() {
                   width: 48,
                   height: 48,
                   borderRadius: 12,
-                  backgroundColor: "#FFF7ED",
+                  backgroundColor: colors.secondaryLight,
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: 12,
                 }}
               >
-                <SFSymbol name="bolt.fill" color="#FF9B7A" size={24} />
+                <SFSymbol name="bolt.fill" color={colors.secondary} size={24} />
               </View>
               <Text
                 style={{
                   fontSize: 28,
                   fontWeight: "700",
-                  color: "#1E293B",
+                  color: colors.text,
                   marginBottom: 4,
                 }}
               >
                 {problemCount}
               </Text>
-              <Text style={{ fontSize: 13, color: "#64748B", textAlign: "center" }}>
+              <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: "center" }}>
                 Problems Solved
               </Text>
             </View>
@@ -342,12 +344,12 @@ export default function HomeScreen() {
             <View
               style={{
                 flex: 1,
-                backgroundColor: "#FFFFFF",
+                backgroundColor: colors.card,
                 borderRadius: 16,
                 padding: 20,
                 alignItems: "center",
                 borderWidth: 1,
-                borderColor: "#E8F1F8",
+                borderColor: colors.border,
               }}
             >
               <View
@@ -355,25 +357,25 @@ export default function HomeScreen() {
                   width: 48,
                   height: 48,
                   borderRadius: 12,
-                  backgroundColor: "#EFF6FF",
+                  backgroundColor: colors.primaryLight,
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: 12,
                 }}
               >
-                <SFSymbol name="target" color="#5B9ED6" size={24} />
+                <SFSymbol name="target" color={colors.primary} size={24} />
               </View>
               <Text
                 style={{
                   fontSize: 28,
                   fontWeight: "700",
-                  color: "#1E293B",
+                  color: colors.text,
                   marginBottom: 4,
                 }}
               >
                 {accuracy}%
               </Text>
-              <Text style={{ fontSize: 13, color: "#64748B", textAlign: "center" }}>
+              <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: "center" }}>
                 Accuracy
               </Text>
             </View>
@@ -382,12 +384,12 @@ export default function HomeScreen() {
             <View
               style={{
                 flex: 1,
-                backgroundColor: "#FFFFFF",
+                backgroundColor: colors.card,
                 borderRadius: 16,
                 padding: 20,
                 alignItems: "center",
                 borderWidth: 1,
-                borderColor: "#E8F1F8",
+                borderColor: colors.border,
               }}
             >
               <View
@@ -395,25 +397,25 @@ export default function HomeScreen() {
                   width: 48,
                   height: 48,
                   borderRadius: 12,
-                  backgroundColor: "#F3E8FF",
+                  backgroundColor: colors.primaryLight,
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: 12,
                 }}
               >
-                <SFSymbol name="chart.line.uptrend.xyaxis" color="#8B5CF6" size={24} />
+                <SFSymbol name="chart.line.uptrend.xyaxis" color={colors.primary} size={24} />
               </View>
               <Text
                 style={{
                   fontSize: 28,
                   fontWeight: "700",
-                  color: "#1E293B",
+                  color: colors.text,
                   marginBottom: 4,
                 }}
               >
                 {dayStreak}
               </Text>
-              <Text style={{ fontSize: 13, color: "#64748B", textAlign: "center" }}>
+              <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: "center" }}>
                 Day Streak
               </Text>
             </View>
@@ -426,7 +428,7 @@ export default function HomeScreen() {
             style={{
               fontSize: 20,
               fontWeight: "700",
-              color: "#1E293B",
+              color: colors.text,
               marginBottom: 16,
             }}
           >
@@ -438,12 +440,12 @@ export default function HomeScreen() {
             <TouchableOpacity
               onPress={() => pickImage(true)}
               style={{
-                backgroundColor: "#A8D5E2", // Softer pastel blue
+                backgroundColor: colors.primary,
                 borderRadius: 20,
                 padding: 20,
                 flexDirection: "row",
                 alignItems: "center",
-                shadowColor: "#5B9ED6",
+                shadowColor: colors.primary,
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.2,
                 shadowRadius: 8,
@@ -484,12 +486,12 @@ export default function HomeScreen() {
             <TouchableOpacity
               onPress={() => pickImage(false)}
               style={{
-                backgroundColor: "#FFB88C", // Softer pastel orange
+                backgroundColor: colors.secondary,
                 borderRadius: 20,
                 padding: 20,
                 flexDirection: "row",
                 alignItems: "center",
-                shadowColor: "#FF9B7A",
+                shadowColor: colors.secondary,
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.2,
                 shadowRadius: 8,
@@ -532,19 +534,19 @@ export default function HomeScreen() {
           {selectedImage && (
             <View
               style={{
-                backgroundColor: "#FFFFFF",
+                backgroundColor: colors.card,
                 borderRadius: 16,
                 padding: 16,
                 marginBottom: 16,
                 borderWidth: 2,
-                borderColor: "#E8F1F8",
+                borderColor: colors.border,
               }}
             >
               <Text
                 style={{
                   fontSize: 14,
                   fontWeight: "600",
-                  color: "#334155",
+                  color: colors.text,
                   marginBottom: 12,
                 }}
               >
@@ -562,7 +564,7 @@ export default function HomeScreen() {
                 <Text
                   style={{
                     fontSize: 14,
-                    color: "#EF4444",
+                    color: colors.error,
                     textAlign: "center",
                     fontWeight: "600",
                   }}
@@ -582,12 +584,12 @@ export default function HomeScreen() {
                 marginBottom: 12,
               }}
             >
-              <FileText color="#64748B" size={20} />
+              <FileText color={colors.textSecondary} size={20} />
               <Text
                 style={{
                   fontSize: 16,
                   fontWeight: "600",
-                  color: "#334155",
+                  color: colors.text,
                   marginLeft: 8,
                 }}
               >
@@ -596,18 +598,18 @@ export default function HomeScreen() {
             </View>
             <TextInput
               style={{
-                backgroundColor: "#FFFFFF",
+                backgroundColor: colors.card,
                 borderRadius: 16,
                 padding: 16,
                 fontSize: 15,
-                color: "#1E293B",
+                color: colors.text,
                 minHeight: 100,
                 textAlignVertical: "top",
                 borderWidth: 2,
-                borderColor: "#E8F1F8",
+                borderColor: colors.border,
               }}
               placeholder="A 5kg box is pushed across a frictionless surface..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.textTertiary}
               multiline
               value={problemText}
               onChangeText={setProblemText}
@@ -621,12 +623,12 @@ export default function HomeScreen() {
             style={{
               backgroundColor:
                 (!problemText && !selectedImage) || uploading
-                  ? "#CBD5E1"
-                  : "#5B9ED6",
+                  ? colors.border
+                  : colors.primary,
               borderRadius: 16,
               padding: 18,
               alignItems: "center",
-              shadowColor: "#5B9ED6",
+              shadowColor: colors.primary,
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity:
                 uploading || (!problemText && !selectedImage) ? 0 : 0.3,
@@ -645,7 +647,50 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Recent History */}
+        {/* Recent History - Error state */}
+        {recentError && !loadingRecent && (
+          <View style={{ paddingHorizontal: 24, marginBottom: 24 }}>
+            <View
+              style={{
+                backgroundColor: colors.card,
+                borderRadius: 16,
+                padding: 16,
+                borderWidth: 1,
+                borderColor: colors.error,
+              }}
+            >
+              <Text style={{ color: colors.error, fontSize: 14, textAlign: "center" }}>
+                {recentError}
+              </Text>
+              <TouchableOpacity
+                onPress={() => { setRecentError(null); loadRecentProblems(); }}
+                style={{ marginTop: 12, alignSelf: "center" }}
+              >
+                <Text style={{ color: colors.primary, fontWeight: "600" }}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        {/* Recent History - Loading */}
+        {loadingRecent && recentProblems.length === 0 && !recentError && (
+          <View style={{ paddingHorizontal: 24, marginBottom: 24 }}>
+            <View
+              style={{
+                backgroundColor: colors.card,
+                borderRadius: 16,
+                padding: 24,
+                alignItems: "center",
+                borderWidth: 1,
+                borderColor: colors.border,
+              }}
+            >
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={{ marginTop: 12, color: colors.textSecondary, fontSize: 14 }}>
+                Loading recent problems...
+              </Text>
+            </View>
+          </View>
+        )}
         {recentProblems.length > 0 && (
           <View style={{ paddingHorizontal: 24, marginBottom: 24 }}>
             <View
@@ -657,13 +702,13 @@ export default function HomeScreen() {
               }}
             >
               <Text
-                style={{ fontSize: 20, fontWeight: "700", color: "#1E293B" }}
+                style={{ fontSize: 20, fontWeight: "700", color: colors.text }}
               >
                 Recent History
               </Text>
               <TouchableOpacity onPress={() => router.push("/(tabs)/library")}>
                 <Text
-                  style={{ fontSize: 15, color: "#5B9ED6", fontWeight: "600" }}
+                  style={{ fontSize: 15, color: colors.primary, fontWeight: "600" }}
                 >
                   View all
                 </Text>
@@ -675,19 +720,19 @@ export default function HomeScreen() {
                 key={problem.id}
                 onPress={() => router.push(`/problem/${problem.id}`)}
                 style={{
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: colors.card,
                   borderRadius: 16,
                   padding: 16,
                   marginBottom: 12,
                   borderWidth: 2,
-                  borderColor: "#E8F1F8",
+                  borderColor: colors.border,
                 }}
               >
                 <Text
                   style={{
                     fontSize: 16,
                     fontWeight: "600",
-                    color: "#1E293B",
+                    color: colors.text,
                     marginBottom: 8,
                   }}
                   numberOfLines={2}
@@ -697,8 +742,8 @@ export default function HomeScreen() {
                 <View
                   style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
                 >
-                  <Clock size={14} color="#94A3B8" />
-                  <Text style={{ fontSize: 13, color: "#94A3B8" }}>
+                  <Clock size={14} color={colors.textSecondary} />
+                  <Text style={{ fontSize: 13, color: colors.textSecondary }}>
                     {formatTimeAgo(problem.created_at)}
                   </Text>
                 </View>

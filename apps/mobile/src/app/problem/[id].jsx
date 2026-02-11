@@ -6,7 +6,14 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from "react-native";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -26,6 +33,7 @@ import {
 } from "@expo-google-fonts/inter";
 import { InstrumentSerif_400Regular } from "@expo-google-fonts/instrument-serif";
 import { useTheme } from "@/utils/theme";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 import { SvgXml } from "react-native-svg";
 import { Image } from "expo-image";
 
@@ -58,8 +66,8 @@ export default function ProblemDetailScreen() {
 
   const fetchProblemDetails = async () => {
     try {
-      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:5173";
-      const response = await fetch(`${baseURL}/api/problems/get?id=${id}`);
+      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
+      const response = await fetchWithTimeout(`${baseURL}/api/problems/get?id=${id}`, {}, 15000);
       if (!response.ok) throw new Error("Failed to fetch problem");
       const data = await response.json();
       setProblem(data.problem);
@@ -76,12 +84,12 @@ export default function ProblemDetailScreen() {
   const handleGenerateVisuals = async () => {
     try {
       setGeneratingVisuals(true);
-      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:5173";
-      const response = await fetch(`${baseURL}/api/problems/generate-visuals`, {
+      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
+      const response = await fetchWithTimeout(`${baseURL}/api/problems/generate-visuals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ problemId: id }),
-      });
+      }, 60000);
 
       if (!response.ok) throw new Error("Failed to generate visuals");
       const data = await response.json();
@@ -97,12 +105,12 @@ export default function ProblemDetailScreen() {
   const handleGenerateDiagram = async (visualId, visualType) => {
     try {
       setGeneratingDiagrams((prev) => ({ ...prev, [visualId]: true }));
-      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:5173";
-      const response = await fetch(`${baseURL}/api/problems/generate-diagrams`, {
+      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
+      const response = await fetchWithTimeout(`${baseURL}/api/problems/generate-diagrams`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ problemId: id, visualType }),
-      });
+      }, 60000);
 
       if (!response.ok) throw new Error("Failed to generate diagram");
       const data = await response.json();
@@ -120,6 +128,7 @@ export default function ProblemDetailScreen() {
   };
 
   const toggleStep = (stepNumber) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setRevealedSteps((prev) =>
       prev.includes(stepNumber)
         ? prev.filter((s) => s !== stepNumber)
@@ -197,6 +206,25 @@ export default function ProblemDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
+          {/* Original Image (if uploaded) */}
+          {problem.problem_image_url && (
+            <View
+              style={{
+                marginBottom: 24,
+                borderRadius: 16,
+                overflow: "hidden",
+                borderWidth: 1,
+                borderColor: colors.cardBorder,
+              }}
+            >
+              <Image
+                source={{ uri: problem.problem_image_url }}
+                style={{ width: "100%", height: 220 }}
+                contentFit="contain"
+              />
+            </View>
+          )}
+
           {/* Problem Text */}
           <View
             style={{

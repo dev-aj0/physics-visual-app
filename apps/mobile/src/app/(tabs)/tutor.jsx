@@ -14,8 +14,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { SymbolView } from "expo-symbols";
 import { Platform as RNPlatform } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { Image } from "expo-image";
+import { Camera } from "lucide-react-native";
 import { useTheme } from "@/utils/theme";
 import useHandleStreamResponse from "@/utils/useHandleStreamResponse";
+import useUpload from "@/utils/useUpload";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 import FormattedText from "@/components/FormattedText";
 
 // SF Symbols icon component wrapper
@@ -55,9 +60,32 @@ export default function TutorScreen() {
   const { colors, isDark } = useTheme();
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
+  const [pendingImage, setPendingImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   const scrollViewRef = useRef(null);
+  const [upload] = useUpload();
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Gallery permission is required to attach images.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setPendingImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Failed to pick image");
+    }
+  };
 
   const handleFinish = useCallback((message) => {
     if (message) {
@@ -76,9 +104,33 @@ export default function TutorScreen() {
   });
 
   const handleSend = async () => {
-    if (!inputText.trim()) return;
+    const text = inputText.trim();
+    if (!text && !pendingImage) return;
 
-    const userMessage = { role: "user", content: inputText.trim() };
+    let imageUrl = null;
+    if (pendingImage) {
+      setLoading(true);
+      const result = await upload({
+        reactNativeAsset: {
+          uri: pendingImage,
+          name: "diagram.jpg",
+          mimeType: "image/jpeg",
+        },
+      });
+      if (result.error) {
+        Alert.alert("Upload failed", result.error);
+        setLoading(false);
+        return;
+      }
+      imageUrl = result.url;
+      setPendingImage(null);
+    }
+
+    const userMessage = {
+      role: "user",
+      content: text || "What can you tell me about this diagram?",
+      imageUrl,
+    };
     setMessages((prev) => [...prev, userMessage]);
     setInputText("");
     setLoading(true);
@@ -87,17 +139,18 @@ export default function TutorScreen() {
     try {
       const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
       const apiUrl = `${baseURL}/api/tutor/chat`;
-      
-      console.log("Sending message to:", apiUrl);
-      
-      const response = await fetch(apiUrl, {
+
+      const payload = {
+        messages: [...messages, { role: "user", content: userMessage.content }],
+        stream: true,
+      };
+      if (imageUrl) payload.imageUrl = imageUrl;
+
+      const response = await fetchWithTimeout(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [...messages, userMessage],
-          stream: true,
-        }),
-      });
+        body: JSON.stringify(payload),
+      }, 60000);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -314,15 +367,29 @@ export default function TutorScreen() {
                   {message.content}
                 </FormattedText>
               ) : (
-                <Text
-                  style={{
-                    fontSize: 15,
-                    color: "#FFFFFF",
-                    lineHeight: 22,
-                  }}
-                >
-                  {message.content}
-                </Text>
+                <>
+                  {message.imageUrl && (
+                    <Image
+                      source={{ uri: message.imageUrl }}
+                      style={{
+                        width: "100%",
+                        height: 120,
+                        borderRadius: 8,
+                        marginBottom: 8,
+                      }}
+                      contentFit="cover"
+                    />
+                  )}
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      color: "#FFFFFF",
+                      lineHeight: 22,
+                    }}
+                  >
+                    {message.content}
+                  </Text>
+                </>
               )}
             </View>
           </View>
@@ -423,7 +490,43 @@ export default function TutorScreen() {
           borderTopColor: colors.border,
         }}
       >
+        {pendingImage && (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <Image
+              source={{ uri: pendingImage }}
+              style={{ width: 56, height: 56, borderRadius: 8 }}
+              contentFit="cover"
+            />
+            <TouchableOpacity
+              onPress={() => setPendingImage(null)}
+              style={{ marginLeft: 8 }}
+            >
+              <Text style={{ color: colors.error, fontSize: 14 }}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <TouchableOpacity
+            onPress={pickImage}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: colors.card,
+              borderWidth: 1,
+              borderColor: colors.border,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Camera size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
           <TextInput
             style={{
               flex: 1,
@@ -437,7 +540,7 @@ export default function TutorScreen() {
               borderWidth: 1,
               borderColor: colors.border,
             }}
-            placeholder="Ask me anything about physics..."
+            placeholder="Ask me anything or attach a diagram..."
             placeholderTextColor={colors.textSecondary}
             value={inputText}
             onChangeText={setInputText}
@@ -450,12 +553,13 @@ export default function TutorScreen() {
               width: 44,
               height: 44,
               borderRadius: 22,
-              backgroundColor: inputText.trim() ? colors.secondary : colors.border,
+              backgroundColor:
+                inputText.trim() || pendingImage ? colors.secondary : colors.border,
               alignItems: "center",
               justifyContent: "center",
             }}
             onPress={handleSend}
-            disabled={!inputText.trim() || loading}
+            disabled={(!inputText.trim() && !pendingImage) || loading}
           >
             {loading ? (
               <ActivityIndicator size="small" color="#FFFFFF" />

@@ -24,17 +24,13 @@ EXPO_PUBLIC_UPLOADCARE_PUBLIC_KEY=your-uploadcare-public-key
 
 ### Mobile App
 
-Create a `.env` file in the `apps/mobile/` directory or use Expo's environment variables:
+Create a `.env` file in the `apps/mobile/` directory:
 
 ```bash
-# Base API URL (usually your web app URL)
-EXPO_PUBLIC_API_URL=http://localhost:5173
-
-# Uploadcare (optional)
-EXPO_PUBLIC_UPLOADCARE_PUBLIC_KEY=your-uploadcare-public-key
-
-# Base URL for user content
-EXPO_PUBLIC_BASE_CREATE_USER_CONTENT_URL=https://your-cdn-url.com
+# Base API URL - points to your backend (required)
+# For iOS Simulator: use http://localhost:4000
+# For physical device: use your Mac's IP, e.g. http://10.8.168.41:4000
+EXPO_PUBLIC_BASE_URL=http://localhost:4000
 ```
 
 ## Getting API Keys
@@ -78,10 +74,19 @@ psql $DATABASE_URL -f apps/web/database/schema.sql
 
 ## Testing the Setup
 
-1. Start the web server: `cd apps/web && npm run dev`
-2. Check that the API endpoints are accessible
-3. Try uploading a problem image to test OCR
-4. Check the database to verify tables were created
+1. Start the backend: `cd apps/web && npm run dev` (runs on http://localhost:4000)
+2. Verify backend is reachable:
+   ```bash
+   curl http://localhost:4000/api/health
+   ```
+   Should return `{"ok":true}`
+3. Test problem list:
+   ```bash
+   curl http://localhost:4000/api/problems/list
+   ```
+   Should return JSON (or 500 if DB is misconfigured)
+4. Start the mobile app: `cd apps/mobile && npm start`
+5. Ensure `EXPO_PUBLIC_BASE_URL` in `apps/mobile/.env` matches the backend URL
 
 ## Troubleshooting
 
@@ -99,3 +104,9 @@ psql $DATABASE_URL -f apps/web/database/schema.sql
 - Make sure the web server is running
 - Check that routes are properly registered
 - Verify the API path matches (`/api/integrations/...`)
+
+### "Everything Just Loading" / App Stuck Loading
+- **Backend not running**: Start `npm run dev` in `apps/web` first
+- **Wrong base URL**: Ensure `EXPO_PUBLIC_BASE_URL` in `apps/mobile/.env` matches your backend. For iOS Simulator use `http://localhost:4000`. For physical device, use your Mac's IP (e.g. `http://10.8.168.41:4000`) - find it with `ifconfig | grep "inet "`
+- **Missing env vars**: Backend needs `DATABASE_URL` and `OPENAI_API_KEY`. Without them, API calls fail with 500
+- **Health check**: Run `curl http://localhost:4000/api/health` to verify backend is reachable

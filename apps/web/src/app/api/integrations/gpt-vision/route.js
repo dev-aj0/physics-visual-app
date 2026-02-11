@@ -52,7 +52,7 @@ export async function POST(request) {
           content: msg.content,
         };
       }),
-      max_tokens: 1000,
+      max_tokens: 2000,
       temperature: 0.3, // Lower temperature for more accurate OCR
     };
 

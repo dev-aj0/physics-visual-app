@@ -54,7 +54,14 @@ export async function POST(request) {
         content: [
           {
             type: "text",
-            text: problemText || "Extract the physics problem from this image. Include all numbers, units, and details. Describe any diagrams shown.",
+            text: problemText || `Extract the physics problem from this image with full detail.
+
+OCR and diagram extraction rules:
+- Transcribe ALL text exactly, including numbers, units, variables, and subscripts
+- For diagrams: describe axes (labels, units), vector directions and magnitudes, angles, coordinate systems
+- Identify force vectors, trajectories, circuit elements, or other physics visual elements
+- Note any handwritten annotations or symbols
+- Preserve mathematical notation (e.g., F = ma, v², Δx)`,
           },
           {
             type: "image_url",

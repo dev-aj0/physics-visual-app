@@ -1,4 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import nodeConsole from 'node:console';
 import { skipCSRFCheck } from '@auth/core';
 import Credentials from '@auth/core/providers/credentials';
@@ -256,6 +258,34 @@ app.use('/api/auth/*', async (c, next) => {
   }
   return next();
 });
+
+// Serve uploaded files
+app.get('/uploads/:filename', async (c) => {
+  const filename = c.req.param('filename');
+  if (!/^[a-zA-Z0-9-]+\.[a-z]+$/i.test(filename)) {
+    return c.json({ error: 'Invalid filename' }, 400);
+  }
+  try {
+    const uploadsDir = join(process.cwd(), 'public', 'uploads');
+    const filePath = join(uploadsDir, filename);
+    const content = await readFile(filePath);
+    const ext = filename.split('.').pop()?.toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      png: 'image/png',
+      webp: 'image/webp',
+      gif: 'image/gif',
+    };
+    const contentType = mimeTypes[ext || ''] || 'application/octet-stream';
+    return new Response(content, {
+      headers: { 'Content-Type': contentType },
+    });
+  } catch {
+    return c.json({ error: 'File not found' }, 404);
+  }
+});
+
 app.route(API_BASENAME, api);
 
 export default await createHonoServer({

@@ -10,19 +10,22 @@ import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { Clock, ChevronRight, Search } from "lucide-react-native";
+import { Clock, Search } from "lucide-react-native";
 import { useState } from "react";
+import { useTheme } from "@/utils/theme";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["problems"],
     queryFn: async () => {
-      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:5173";
-      const response = await fetch(`${baseURL}/api/problems/list`);
+      const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
+      const response = await fetchWithTimeout(`${baseURL}/api/problems/list`, {}, 15000);
       if (!response.ok) throw new Error("Failed to fetch problems");
       return response.json();
     },
@@ -55,8 +58,8 @@ export default function LibraryScreen() {
   ];
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F8FBFD" }}>
-      <StatusBar style="dark" />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={isDark ? "light" : "dark"} />
 
       <ScrollView
         style={{ flex: 1 }}
@@ -72,13 +75,13 @@ export default function LibraryScreen() {
             style={{
               fontSize: 32,
               fontWeight: "700",
-              color: "#1E293B",
+              color: colors.text,
               marginBottom: 8,
             }}
           >
             My Problems
           </Text>
-          <Text style={{ fontSize: 16, color: "#64748B" }}>
+          <Text style={{ fontSize: 16, color: colors.textSecondary }}>
             Review and continue your physics problems
           </Text>
         </View>
@@ -87,25 +90,25 @@ export default function LibraryScreen() {
         <View style={{ paddingHorizontal: 24, marginBottom: 20 }}>
           <View
             style={{
-              backgroundColor: "#FFFFFF",
+              backgroundColor: colors.card,
               borderRadius: 16,
               padding: 16,
               flexDirection: "row",
               alignItems: "center",
               borderWidth: 2,
-              borderColor: "#E8F1F8",
+              borderColor: colors.border,
             }}
           >
-            <Search size={20} color="#94A3B8" />
+            <Search size={20} color={colors.textSecondary} />
             <TextInput
               style={{
                 flex: 1,
                 marginLeft: 12,
                 fontSize: 15,
-                color: "#1E293B",
+                color: colors.text,
               }}
               placeholder="Search problems..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={colors.textTertiary}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -130,18 +133,19 @@ export default function LibraryScreen() {
                 onPress={() => setSelectedFilter(filter.id)}
                 style={{
                   backgroundColor:
-                    selectedFilter === filter.id ? "#FF9B7A" : "#F1F5F9",
+                    selectedFilter === filter.id ? colors.primary : colors.card,
                   borderRadius: 20,
                   paddingVertical: 10,
                   paddingHorizontal: 20,
-                  borderWidth: 0,
+                  borderWidth: 1,
+                  borderColor: colors.border,
                 }}
               >
                 <Text
                   style={{
                     fontSize: 15,
                     fontWeight: "600",
-                    color: selectedFilter === filter.id ? "#FFFFFF" : "#64748B",
+                    color: selectedFilter === filter.id ? "#FFFFFF" : colors.textSecondary,
                   }}
                 >
                   {filter.label}
@@ -153,24 +157,24 @@ export default function LibraryScreen() {
 
         {/* Problems List */}
         <View style={{ paddingHorizontal: 24 }}>
-          {isLoading && (
+            {isLoading && (
             <View style={{ paddingVertical: 40, alignItems: "center" }}>
-              <ActivityIndicator size="large" color="#5B9ED6" />
+              <ActivityIndicator size="large" color={colors.primary} />
             </View>
           )}
 
           {error && (
             <View
               style={{
-                backgroundColor: "#FEF2F2",
+                backgroundColor: colors.card,
                 borderRadius: 16,
                 padding: 20,
                 borderWidth: 2,
-                borderColor: "#FEE2E2",
+                borderColor: colors.error,
               }}
             >
               <Text
-                style={{ fontSize: 15, color: "#DC2626", textAlign: "center" }}
+                style={{ fontSize: 15, color: colors.error, textAlign: "center" }}
               >
                 Failed to load problems
               </Text>
@@ -180,12 +184,12 @@ export default function LibraryScreen() {
           {filteredProblems.length === 0 && !isLoading && (
             <View
               style={{
-                backgroundColor: "#FFFFFF",
+                backgroundColor: colors.card,
                 borderRadius: 16,
                 padding: 32,
                 alignItems: "center",
                 borderWidth: 2,
-                borderColor: "#E8F1F8",
+                borderColor: colors.border,
               }}
             >
               <Text style={{ fontSize: 48, marginBottom: 16 }}>📚</Text>
@@ -193,14 +197,14 @@ export default function LibraryScreen() {
                 style={{
                   fontSize: 18,
                   fontWeight: "600",
-                  color: "#1E293B",
+                  color: colors.text,
                   marginBottom: 8,
                 }}
               >
                 {searchQuery ? "No matches found" : "No problems yet"}
               </Text>
               <Text
-                style={{ fontSize: 15, color: "#64748B", textAlign: "center" }}
+                style={{ fontSize: 15, color: colors.textSecondary, textAlign: "center" }}
               >
                 {searchQuery
                   ? "Try a different search term"
@@ -249,12 +253,12 @@ export default function LibraryScreen() {
                 key={problem.id}
                 onPress={() => router.push(`/problem/${problem.id}`)}
                 style={{
-                  backgroundColor: "#FFFFFF",
+                  backgroundColor: colors.card,
                   borderRadius: 16,
                   padding: 20,
                   marginBottom: 12,
                   borderWidth: 1,
-                  borderColor: "#E8F1F8",
+                  borderColor: colors.border,
                 }}
               >
                 <View
@@ -292,10 +296,10 @@ export default function LibraryScreen() {
                       </Text>
                     </View>
                     {isCompleted && (
-                      <Text style={{ fontSize: 16, color: "#5B9ED6" }}>✓</Text>
+                      <Text style={{ fontSize: 16, color: colors.primary }}>✓</Text>
                     )}
                     {hasVisuals && (
-                      <Text style={{ fontSize: 14, color: "#10B981" }}>📊</Text>
+                      <Text style={{ fontSize: 14, color: colors.success }}>📊</Text>
                     )}
                   </View>
                 </View>
@@ -303,7 +307,7 @@ export default function LibraryScreen() {
                   style={{
                     fontSize: 15,
                     fontWeight: "500",
-                    color: "#1E293B",
+                    color: colors.text,
                     marginBottom: 12,
                     lineHeight: 22,
                   }}
@@ -318,8 +322,8 @@ export default function LibraryScreen() {
                     gap: 6,
                   }}
                 >
-                  <Clock size={14} color="#94A3B8" />
-                  <Text style={{ fontSize: 13, color: "#94A3B8" }}>
+                  <Clock size={14} color={colors.textSecondary} />
+                  <Text style={{ fontSize: 13, color: colors.textSecondary }}>
                     {formatDate(problem.created_at)}
                   </Text>
                 </View>
