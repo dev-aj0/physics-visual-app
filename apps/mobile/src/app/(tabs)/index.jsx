@@ -5,6 +5,7 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -62,7 +63,7 @@ export default function HomeScreen() {
   const [recentError, setRecentError] = useState(null);
   const [upload] = useUpload();
 
-  const { data: problemsData } = useQuery({
+  const { data: problemsData, refetch: refetchProblems } = useQuery({
     queryKey: ["problems"],
     queryFn: async () => {
       const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
@@ -210,6 +211,13 @@ export default function HomeScreen() {
     }
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadRecentProblems(), refetchProblems()]);
+    setRefreshing(false);
+  };
+
   const formatTimeAgo = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -235,6 +243,13 @@ export default function HomeScreen() {
           paddingBottom: insets.bottom + 100,
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* Header */}
         <View style={{ paddingHorizontal: 24, marginBottom: 32 }}>

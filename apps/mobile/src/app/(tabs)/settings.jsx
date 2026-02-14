@@ -2,11 +2,16 @@ import { View, Text, ScrollView, TouchableOpacity, Switch } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SymbolView } from "expo-symbols";
-import { Platform } from "react-native";
+import { Platform, Linking } from "react-native";
 import { router } from "expo-router";
 import { useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "@/utils/theme";
 import { useDarkModeStore } from "@/utils/darkModeStore";
+
+const NOTIFICATIONS_KEY = "@physics_tutor/notifications";
+const SOUND_EFFECTS_KEY = "@physics_tutor/sound_effects";
+const HAPTIC_FEEDBACK_KEY = "@physics_tutor/haptic_feedback";
 
 // SF Symbols icon component wrapper
 function SFSymbol({ name, color, size = 24 }: { name: string; color: string; size?: number }) {
@@ -51,10 +56,38 @@ export default function SettingsScreen() {
   const [notifications, setNotifications] = useState(true);
   const [soundEffects, setSoundEffects] = useState(true);
   const [hapticFeedback, setHapticFeedback] = useState(true);
-  
+
   useEffect(() => {
     useDarkModeStore.getState().init();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [n, s, h] = await Promise.all([
+          AsyncStorage.getItem(NOTIFICATIONS_KEY),
+          AsyncStorage.getItem(SOUND_EFFECTS_KEY),
+          AsyncStorage.getItem(HAPTIC_FEEDBACK_KEY),
+        ]);
+        if (n !== null) setNotifications(n === "true");
+        if (s !== null) setSoundEffects(s === "true");
+        if (h !== null) setHapticFeedback(h === "true");
+      } catch (_) {}
+    })();
+  }, []);
+
+  const persistNotifications = (value) => {
+    setNotifications(value);
+    AsyncStorage.setItem(NOTIFICATIONS_KEY, String(value));
+  };
+  const persistSoundEffects = (value) => {
+    setSoundEffects(value);
+    AsyncStorage.setItem(SOUND_EFFECTS_KEY, String(value));
+  };
+  const persistHapticFeedback = (value) => {
+    setHapticFeedback(value);
+    AsyncStorage.setItem(HAPTIC_FEEDBACK_KEY, String(value));
+  };
 
   const preferences = [
     {
@@ -62,7 +95,7 @@ export default function SettingsScreen() {
       title: "Notifications",
       subtitle: "Study reminders and updates",
       value: notifications,
-      onValueChange: setNotifications,
+      onValueChange: persistNotifications,
       type: "switch",
     },
     {
@@ -78,7 +111,7 @@ export default function SettingsScreen() {
       title: "Sound Effects",
       subtitle: "Play sounds on interactions",
       value: soundEffects,
-      onValueChange: setSoundEffects,
+      onValueChange: persistSoundEffects,
       type: "switch",
     },
     {
@@ -86,7 +119,7 @@ export default function SettingsScreen() {
       title: "Haptic Feedback",
       subtitle: "Vibrations on tap",
       value: hapticFeedback,
-      onValueChange: setHapticFeedback,
+      onValueChange: persistHapticFeedback,
       type: "switch",
     },
   ];
@@ -106,17 +139,28 @@ export default function SettingsScreen() {
       title: "Help & Support",
       subtitle: "FAQs, contact us",
       type: "navigation",
-      onPress: () => {
-        // Navigate to help & support
-      },
+      onPress: () => router.push("/help"),
     },
     {
       icon: "star",
       title: "Rate the App",
       subtitle: "Leave a review",
       type: "navigation",
-      onPress: () => {
-        // Open app store rating
+      onPress: async () => {
+        const url = process.env.EXPO_PUBLIC_APP_STORE_URL || (Platform.OS === "ios"
+          ? "https://apps.apple.com/app/id000000000?action=write-review"
+          : "market://details?id=xyz.create.CreateExpoEnvironment");
+        try {
+          const canOpen = await Linking.canOpenURL(url);
+          if (canOpen) await Linking.openURL(url);
+        } catch (e) {
+          // Fallback to generic store search
+          if (Platform.OS === "ios") {
+            Linking.openURL("https://apps.apple.com/");
+          } else {
+            Linking.openURL("https://play.google.com/store/apps");
+          }
+        }
       },
     },
   ];

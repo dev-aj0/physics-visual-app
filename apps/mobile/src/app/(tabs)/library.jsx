@@ -5,6 +5,7 @@ import {
   ScrollView,
   ActivityIndicator,
   TextInput,
+  RefreshControl,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,7 +22,7 @@ export default function LibraryScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["problems"],
     queryFn: async () => {
       const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
@@ -68,6 +69,13 @@ export default function LibraryScreen() {
           paddingBottom: insets.bottom + 100,
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching && !isLoading}
+            onRefresh={refetch}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* Header */}
         <View style={{ paddingHorizontal: 24, marginBottom: 24 }}>

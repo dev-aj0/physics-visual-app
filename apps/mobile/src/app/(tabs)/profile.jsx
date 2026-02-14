@@ -1,6 +1,7 @@
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 import {
   Award,
   BookOpen,
@@ -60,10 +61,12 @@ function SFSymbol({ name, color, size = 24 }: { name: string; color: string; siz
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
 
+  const baseURL = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:4000";
+
   const { data } = useQuery({
     queryKey: ["problems"],
     queryFn: async () => {
-      const response = await fetch("/api/problems/list");
+      const response = await fetchWithTimeout(`${baseURL}/api/problems/list`, {}, 15000);
       if (!response.ok) throw new Error("Failed to fetch problems");
       return response.json();
     },
@@ -96,7 +99,7 @@ export default function ProfileScreen() {
       icon: "questionmark.circle", 
       label: "Help & Support", 
       subtitle: "FAQs and contact us",
-      onPress: () => {},
+      onPress: () => router.push("/help"),
     },
   ];
 

@@ -42,6 +42,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="problem/[id]" />
           <Stack.Screen name="tutor/[id]" />
+          <Stack.Screen name="help" options={{ headerShown: true }} />
         </Stack>
       </GestureHandlerRootView>
     </QueryClientProvider>
